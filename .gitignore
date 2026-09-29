@@ -1,0 +1,17 @@
+node_modules/
+.npm-cache/
+dist/
+.env
+.env.*
+!.env.example
+supabase/functions/.env
+student*.txt
+*.xlsx
+*.xls
+*.csv
+/qrcode.png
+PRIVATE_SETUP.md
+test-results/
+playwright-report/
+*.log
+.DS_Store

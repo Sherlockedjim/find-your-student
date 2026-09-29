@@ -1,0 +1,12 @@
+project_id = "find-your-student"
+
+[functions.apply]
+verify_jwt = false
+[functions.map-service]
+verify_jwt = false
+[functions.amap-proxy]
+verify_jwt = false
+[functions.parse-orders]
+verify_jwt = false
+[functions.admin-users]
+verify_jwt = false
