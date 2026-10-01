@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Location, Refresh, Star, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import {
@@ -105,18 +105,24 @@ async function calculate() {
     const list = store.orders.filter(
       (o) => o.lng !== null && o.lat !== null && minuteCache[o.id] === undefined,
     )
-    let index = 0
-    await Promise.all(
-      [1, 2, 3].map(async () => {
-        while (index < list.length && token === epoch) {
-          const o = list[index++]
-          const m = await transit(point, [o.lng!, o.lat!])
-          if (token === epoch) minuteCache[o.id] = m
+    for (let index = 0; index < list.length && token === epoch; index++) {
+      if (token !== epoch) break
+      const o = list[index]
+      let m: number | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          m = await transit(point, [o.lng!, o.lat!])
+          break
+        } catch (e) {
+          const rateLimited = (e as Error).message.includes('10021')
+          if (!rateLimited || attempt === 2 || token !== epoch) throw e
+          await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1) + Math.random() * 800))
         }
-      }),
-    )
+      }
+      if (token === epoch) minuteCache[o.id] = m
+    }
   } catch (e) {
-    ElMessage.error((e as Error).message)
+    if (token === epoch) ElMessage.error((e as Error).message)
   } finally {
     if (token === epoch) busy.value = false
   }
@@ -129,7 +135,7 @@ function setOrigin(p: [number, number], label: string) {
   originLabel.value = label
   originDialog.value = false
   picking.value = false
-  void calculate()
+  if (sort.value === 'commute' || filters.maxCommute !== null) void calculate()
 }
 async function locate() {
   if (!navigator.geolocation) {
@@ -146,13 +152,25 @@ async function locate() {
         originDialog.value = true
       }
     },
-    () => {
-      ElMessage.warning('定位未获授权或失败，请手动输入地点或在地图选点。')
+    (error) => {
+      const message = error.code === 1
+        ? '浏览器或系统未允许定位，请在网站权限中允许“位置”后重试。'
+        : error.code === 2
+          ? '设备暂时无法获取位置，请检查系统定位服务或改用地点搜索。'
+          : error.code === 3
+            ? '定位等待超时，请重试或改用地点搜索。'
+            : '定位失败，请改用地点搜索或在地图选点。'
+      ElMessage.warning(message)
       originDialog.value = true
     },
     { timeout: 10000, maximumAge: 60000 },
   )
 }
+onMounted(() => {
+  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && window.matchMedia('(pointer: coarse)').matches)
+  if (mobile) void locate()
+})
 async function searchOrigin() {
   if (!originText.value.trim()) return
   try {

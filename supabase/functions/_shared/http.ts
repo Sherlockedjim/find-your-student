@@ -48,7 +48,10 @@ export async function limit(req: Request, action: string, maximum: number, secon
 export async function amap(path: string, params: Record<string,string>) {
   const url = new URL(`https://restapi.amap.com${path}`); url.search = new URLSearchParams({ ...params,key: secret('AMAP_WEB_SERVICE_KEY') }).toString()
   const r = await fetch(url,{signal: AbortSignal.timeout(15000)}); if (!r.ok) throw new Error('高德服务暂时不可用')
-  const data = await r.json(); if (data.status !== '1') throw new Error(`高德查询失败（${data.infocode || '未知'}），请核对后台 Key 与配额`)
+  const data = await r.json(); if (data.status !== '1') {
+    if (String(data.infocode) === '10021') throw new Error('高德公交接口请求过快（10021，账号 QPS 超限），请稍后重试。')
+    throw new Error(`高德查询失败（${data.infocode || '未知'}），请检查高德服务配置`)
+  }
   return data
 }
 export function point(v: any): string {

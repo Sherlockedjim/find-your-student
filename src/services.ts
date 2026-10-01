@@ -327,9 +327,18 @@ export async function geocodeCandidate(c: Candidate) {
   c.locationQuality = best.level === '区县' ? '区域中心' : '近似位置'
   if (res.locations.length > 1) c.anomalies = [...new Set([...c.anomalies, '多个定位候选，请人工核对'])]
 }
-export async function transit(origin: [number, number], destination: [number, number]) {
-  const r = await mapRequest({ action: 'transit', origin, destination, ...nextDaytime() })
-  return r.minutes as number | null
+let transitQueue: Promise<void> = Promise.resolve()
+let lastTransitRequestAt = 0
+export function transit(origin: [number, number], destination: [number, number]) {
+  const request = transitQueue.then(async () => {
+    const wait = Math.max(0, 1100 - (Date.now() - lastTransitRequestAt))
+    if (wait) await new Promise((resolve) => setTimeout(resolve, wait))
+    lastTransitRequestAt = Date.now()
+    const r = await mapRequest({ action: 'transit', origin, destination, ...nextDaytime() })
+    return r.minutes as number | null
+  })
+  transitQueue = request.then(() => undefined, () => undefined)
+  return request
 }
 export async function logout() {
   if (store.session && supabase) await supabase.auth.signOut()
