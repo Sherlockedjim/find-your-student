@@ -313,7 +313,8 @@ export async function submitApplication(order: Order, form: Record<string, strin
     })
 }
 export async function mapRequest(body: any) {
-  if (!supabase || DEMO) throw new Error('需完成真实模式及地图后台配置后才能查询高德服务')
+  if (!supabase)
+    throw new Error('高德服务未配置：请检查 Supabase URL、publishable key、云函数部署及高德 Web 服务 Key。')
   return invokeFunction('map-service', body)
 }
 export async function geocodeCandidate(c: Candidate) {

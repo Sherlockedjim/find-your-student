@@ -98,10 +98,6 @@ async function calculate() {
     originDialog.value = true
     return
   }
-  if (DEMO) {
-    ElMessage.info('演示模式不生成虚构通勤时长；接通高德后可用。')
-    return
-  }
   const token = ++epoch,
     point = [...origin.value] as [number, number]
   busy.value = true
@@ -136,10 +132,6 @@ function setOrigin(p: [number, number], label: string) {
   void calculate()
 }
 async function locate() {
-  if (DEMO) {
-    ElMessage.info('真实定位与通勤需接通高德，可先输入位置或选择示意点。')
-    return
-  }
   if (!navigator.geolocation) {
     originDialog.value = true
     return
@@ -380,7 +372,7 @@ async function send() {
       <el-alert
         v-if="DEMO"
         type="info"
-        title="示意模式不能查询真实路线，请先完成高德配置。"
+        title="将通过高德查询真实公交路线；演示学生资料不会写入真实数据库。"
         :closable="false"
     /></el-dialog>
     <el-dialog
