@@ -56,7 +56,7 @@ function fallbackPick(e: MouseEvent) {
 }
 onMounted(async () => {
   const key = import.meta.env.VITE_AMAP_JS_KEY
-  if (DEMO || !key) return
+  if (!key) return
   try {
     const host =
       import.meta.env.VITE_AMAP_PROXY_URL ||
