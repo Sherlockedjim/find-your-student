@@ -35,7 +35,7 @@ function nearbyGuangzhou([lng, lat]: [number, number]) {
   return lng >= 112.7 && lng <= 114.1 && lat >= 22.4 && lat <= 24.2
 }
 function isMobileBrowser() {
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  return /Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent) ||
     (navigator.maxTouchPoints > 1 && window.matchMedia('(pointer: coarse)').matches)
 }
 function showLocationIssue(message: string) {
@@ -50,6 +50,8 @@ const filters = reactive(defaultFilters()),
 const origin = ref<[number, number] | null>(null),
   originLabel = ref('设置我的出发点'),
   originDialog = ref(false),
+  mobileLocationDialog = ref(false),
+  mobilePermissionState = ref<'prompt' | 'denied' | 'unavailable'>('prompt'),
   locationIssue = ref(''),
   originText = ref(''),
   picking = ref(false),
@@ -196,8 +198,31 @@ async function locate() {
     { enableHighAccuracy: mobile, timeout: mobile ? 20000 : 12000, maximumAge: mobile ? 0 : 60000 },
   )
 }
+function requestMobileLocation() {
+  mobileLocationDialog.value = false
+  void locate()
+}
+async function prepareMobileLocation() {
+  if (!isMobileBrowser()) return
+  if (!window.isSecureContext || !navigator.geolocation) {
+    mobilePermissionState.value = 'unavailable'
+    mobileLocationDialog.value = true
+    return
+  }
+  try {
+    const permission = await navigator.permissions?.query({ name: 'geolocation' })
+    if (permission?.state === 'granted') {
+      void locate()
+      return
+    }
+    mobilePermissionState.value = permission?.state === 'denied' ? 'denied' : 'prompt'
+  } catch {
+    mobilePermissionState.value = 'prompt'
+  }
+  mobileLocationDialog.value = true
+}
 onMounted(() => {
-  if (isMobileBrowser()) void locate()
+  void prepareMobileLocation()
 })
 async function searchOrigin() {
   if (!originText.value.trim()) return
@@ -406,6 +431,20 @@ async function send() {
         ><span><i class="legend-negotiable">●</i>价格面议</span><span>仅已上架单子显示在地图</span>
       </div>
     </section>
+    <el-dialog v-model="mobileLocationDialog" title="允许获取当前位置" width="400px" align-center
+      class="mobile-location-dialog" :close-on-click-modal="false">
+      <p class="dialog-intro">允许位置权限后，可以从你的当前位置查询广州家教单的公交、地铁通勤时间。你的出发点不会展示给其他访客。</p>
+      <p v-if="mobilePermissionState === 'prompt'" class="mobile-location-hint">点击下方按钮后，浏览器会请求位置权限，请选择“允许”。</p>
+      <el-alert v-if="mobilePermissionState === 'denied'" type="warning" :closable="false"
+        title="此前已禁止本站定位，浏览器不会再次自动弹出授权。请在浏览器的网站权限中改为允许，或手动选择出发点。" />
+      <el-alert v-else-if="mobilePermissionState === 'unavailable'" type="warning" :closable="false"
+        title="当前浏览器无法请求位置权限。请使用支持定位的浏览器，或手动选择出发点。" />
+      <div class="mobile-location-actions">
+        <el-button v-if="mobilePermissionState !== 'unavailable'" type="primary" size="large"
+          @click="requestMobileLocation">{{ mobilePermissionState === 'denied' ? '重试定位' : '允许定位，查询通勤' }}</el-button>
+        <el-button size="large" @click="mobileLocationDialog = false">暂不使用位置</el-button>
+      </div>
+    </el-dialog>
     <el-dialog v-model="originDialog" title="设置通勤出发点" width="440px" align-center
       ><p class="dialog-intro">从这里出发，按白天公交 / 地铁最快方案筛选。</p>
       <el-alert v-if="locationIssue" class="location-issue" :title="locationIssue" type="warning" :closable="false" show-icon />

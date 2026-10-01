@@ -870,6 +870,25 @@ button {
 .location-issue {
   margin-bottom: 14px;
 }
+.mobile-location-dialog .dialog-intro {
+  color: #58677e;
+  font-size: 14px;
+}
+.mobile-location-hint {
+  color: #76859a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mobile-location-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+.mobile-location-actions .el-button {
+  width: 100%;
+  margin-left: 0;
+}
 .dialog-actions {
   display: flex;
   gap: 10px;
