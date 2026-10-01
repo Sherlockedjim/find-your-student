@@ -28,7 +28,16 @@ import OrderCard from './OrderCard.vue'
 const emit = defineEmits<{ login: []; wechat: [] }>()
 function pickOrigin() {
   originDialog.value = false
+  locationIssue.value = ''
   picking.value = true
+}
+function nearbyGuangzhou([lng, lat]: [number, number]) {
+  return lng >= 112.7 && lng <= 114.1 && lat >= 22.4 && lat <= 24.2
+}
+function showLocationIssue(message: string) {
+  locationIssue.value = message
+  picking.value = false
+  originDialog.value = true
 }
 const filters = reactive(defaultFilters()),
   sort = ref('latest'),
@@ -37,6 +46,7 @@ const filters = reactive(defaultFilters()),
 const origin = ref<[number, number] | null>(null),
   originLabel = ref('设置我的出发点'),
   originDialog = ref(false),
+  locationIssue = ref(''),
   originText = ref(''),
   picking = ref(false),
   busy = ref(false)
@@ -128,28 +138,42 @@ async function calculate() {
   }
 }
 function setOrigin(p: [number, number], label: string) {
+  if (!nearbyGuangzhou(p)) {
+    showLocationIssue('出发点位于广州及周边可查询范围外，请输入广州附近的地点或在地图选点。')
+    return
+  }
   epoch++
   busy.value = false
   Object.keys(minuteCache).forEach((k) => delete minuteCache[Number(k)])
   origin.value = p
   originLabel.value = label
   originDialog.value = false
+  locationIssue.value = ''
   picking.value = false
   if (sort.value === 'commute' || filters.maxCommute !== null) void calculate()
 }
 async function locate() {
   if (!navigator.geolocation) {
-    originDialog.value = true
+    showLocationIssue('当前浏览器不支持定位，请输入出发地或在地图选点。')
     return
   }
+  locationIssue.value = ''
   navigator.geolocation.getCurrentPosition(
     async (p) => {
+      const position: [number, number] = [p.coords.longitude, p.coords.latitude]
+      if (!nearbyGuangzhou(position)) {
+        showLocationIssue('浏览器返回的位置不在广州及周边，可能是代理或设备定位偏差。请检查系统定位和精确位置设置，或手动输入出发地、在地图选点。')
+        return
+      }
+      if (p.coords.accuracy > 5000) {
+        showLocationIssue('设备提供的位置误差超过 5 公里，不适合计算通勤。请开启精确定位，或手动输入出发地、在地图选点。')
+        return
+      }
       try {
-        const r = await mapRequest({ action: 'convert', location: [p.coords.longitude, p.coords.latitude] })
+        const r = await mapRequest({ action: 'convert', location: position })
         setOrigin(r.location, '我的当前位置')
       } catch (e) {
-        ElMessage.error((e as Error).message)
-        originDialog.value = true
+        showLocationIssue((e as Error).message)
       }
     },
     (error) => {
@@ -160,10 +184,9 @@ async function locate() {
           : error.code === 3
             ? '定位等待超时，请重试或改用地点搜索。'
             : '定位失败，请改用地点搜索或在地图选点。'
-      ElMessage.warning(message)
-      originDialog.value = true
+      showLocationIssue(message)
     },
-    { timeout: 10000, maximumAge: 60000 },
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
   )
 }
 onMounted(() => {
@@ -380,6 +403,7 @@ async function send() {
     </section>
     <el-dialog v-model="originDialog" title="设置通勤出发点" width="440px" align-center
       ><p class="dialog-intro">从这里出发，按白天公交 / 地铁最快方案筛选。</p>
+      <el-alert v-if="locationIssue" class="location-issue" :title="locationIssue" type="warning" :closable="false" show-icon />
       <el-input v-model="originText" placeholder="例如：华南师范大学石牌校区" @keyup.enter="searchOrigin"
         ><template #append><el-button @click="searchOrigin">查找</el-button></template></el-input
       >
