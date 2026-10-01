@@ -34,6 +34,10 @@ function pickOrigin() {
 function nearbyGuangzhou([lng, lat]: [number, number]) {
   return lng >= 112.7 && lng <= 114.1 && lat >= 22.4 && lat <= 24.2
 }
+function isMobileBrowser() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && window.matchMedia('(pointer: coarse)').matches)
+}
 function showLocationIssue(message: string) {
   locationIssue.value = message
   picking.value = false
@@ -158,6 +162,7 @@ async function locate() {
     return
   }
   locationIssue.value = ''
+  const mobile = isMobileBrowser()
   navigator.geolocation.getCurrentPosition(
     async (p) => {
       const position: [number, number] = [p.coords.longitude, p.coords.latitude]
@@ -182,17 +187,17 @@ async function locate() {
         : error.code === 2
           ? '设备暂时无法获取位置，请检查系统定位服务或改用地点搜索。'
           : error.code === 3
-            ? '定位等待超时，请重试或改用地点搜索。'
+            ? !mobile && /Windows/i.test(navigator.userAgent)
+              ? '电脑定位超时。请在 Windows「设置 → 隐私和安全性 → 位置」开启定位服务和桌面应用位置权限，再允许浏览器使用位置；或手动选择出发点。'
+              : '定位等待超时，请重试或改用地点搜索。'
             : '定位失败，请改用地点搜索或在地图选点。'
       showLocationIssue(message)
     },
-    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    { enableHighAccuracy: mobile, timeout: mobile ? 20000 : 12000, maximumAge: mobile ? 0 : 60000 },
   )
 }
 onMounted(() => {
-  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 1 && window.matchMedia('(pointer: coarse)').matches)
-  if (mobile) void locate()
+  if (isMobileBrowser()) void locate()
 })
 async function searchOrigin() {
   if (!originText.value.trim()) return
